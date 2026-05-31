@@ -40,9 +40,8 @@ CMD ["/bin/bash"]
 Then build it, install it and run it.
 
 ```bash
-pd build -t ww_prydwen_api:latest -o ww_prydwen_api.oci.tar.gz .
-pd install ./ww_prydwen_api.oci.tar.gz
-pd sh ./ww_prydwen_api --isolated
+pd build -t ww_prydwen_api --install-as ww_prydwen_api --no-cache .
+pd sh ww_prydwen_api --isolated
 ```
 
 ## Usage
