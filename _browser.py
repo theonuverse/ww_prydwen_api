@@ -9,6 +9,7 @@ class _WWBrowser:
     def _open(self, url: str) -> Page:
         page = self._browser.new_page()
         page.goto(url, wait_until="domcontentloaded")
+
         return page
 
     def close(self) -> None:
