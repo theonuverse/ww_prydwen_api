@@ -2,7 +2,7 @@ from playwright.sync_api import sync_playwright, Page, Browser, Playwright
 
 
 class _WWBrowser:
-    def __init__(self, headless: bool = True) -> None:
+    def __init__(self, headless: bool = False) -> None:
         self._playwright: Playwright = sync_playwright().start()
         self._browser: Browser = self._playwright.chromium.launch(headless=headless)
 
