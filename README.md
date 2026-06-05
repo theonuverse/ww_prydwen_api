@@ -73,33 +73,33 @@ with Characters() as chars:
     print(char.kit.skills.concerto.intro_skill.name)
     
     # multipliers still use the .get() method and .all property
-    print(skill.multipliers.get(5))  # level 5 multiplier
-    print(skill.multipliers.all)     # dict of all 10 levels
+    print(skill.multipliers.get(5)) # level 5 multiplier
+    print(skill.multipliers.all)    # dict of all 10 levels
 
     # resonance chain
     chain = char.kit.resonance_chain
-    print(chain.get(1).name)  # S1
-    print(chain.all)          # dict of all 6 nodes
+    print(chain.get(1).name)    # S1
+    print(chain.all)            # dict of all 6 nodes
 
     # upgrade materials
     mats = char.kit.upgrade_materials.character_ascension
-    print(mats.get(1).name)   # first material required for ascension
-    print(mats.all)           # dict of all ascension materials
+    print(mats.get(1).name) # first material required for ascension
+    print(mats.all)         # dict of all ascension materials
     
     skill_mats = char.kit.upgrade_materials.skill_upgrades
-    print(skill_mats.all)     # dict of all skill upgrade materials
+    print(skill_mats.all)   # dict of all skill upgrade materials
     
     # review
     review = char.review
-    print(review.pros.get(1)) # first pro point
-    print(review.cons.all)    # dict of all con points
-    print(review.full_review) # full text review
+    print(review.pros.get(1))   # first pro point
+    print(review.cons.all)      # dict of all con points
+    print(review.full_review)   # full text review
     
-    # review ratings (Tier lists and Value Tier lists)
+    # review ratings (Tier lists and Value Tier lists, only returns right values if characters have these tier list ratings.)
     ratings = review.ratings
-    print(ratings.tier_list.dps.toa)       # DPS rating for Tower of Adversity
-    print(ratings.tier_list.hybrid.whiwa)  # Hybrid rating for Whimpering Wastes
-    print(ratings.value_tier_list.support.toa) # Pull Value rating for Tower of Adversity
+    print(ratings.tier_list.dps.toa)            # DPS rating for Tower of Adversity
+    print(ratings.tier_list.hybrid.whiwa)       # Hybrid rating for Whimpering Wastes
+    print(ratings.value_tier_list.support.toa)  # Pull Value rating for Tower of Adversity
 ```
 
 ## What's implemented
