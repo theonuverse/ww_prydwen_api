@@ -43,7 +43,7 @@ Then build it, install it and run it.
 
 ```bash
 pd build -t ww_prydwen_api:latest --install-as ww_prydwen_api --no-cache .
-pd sh ./ww_prydwen_api
+pd sh ww_prydwen_api
 ```
 
 ## Usage
