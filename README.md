@@ -27,7 +27,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN \
         apt-get update && apt-get upgrade -y && \
-        apt-get install python3 python3-pip git neovim -y && \
+        apt-get install python3 python3-pip git -y && \
         pip install playwright playwright-stealth --break-system-packages && \
         playwright install-deps && \
         playwright install chromium
