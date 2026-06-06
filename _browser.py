@@ -1,44 +1,43 @@
-import os
+from typing import Self
 from playwright.sync_api import sync_playwright, Page, Browser, BrowserContext, Playwright
 from playwright_stealth import Stealth
 
 
 class _WWBrowser:
-    def __init__(self, headless: bool = True) -> None:
+    def __init__(self, headless: bool = True, trace: bool = False) -> None:
         self.headless = headless
-        self.debug_mode = os.getenv("WW_DEBUG") == "1"
+        self.trace = trace
+        self._stealth_ctx = Stealth().use_sync(sync_playwright())
+        self._pw: Playwright | None = None
+        self._browser: Browser | None = None
+        self._context: BrowserContext | None = None
 
-        self._stealth_manager = Stealth().use_sync(sync_playwright())
-        self._playwright: Playwright = self._stealth_manager.__enter__()
-
-        self._browser: Browser = self._playwright.chromium.launch(headless=headless)
-        self._context: BrowserContext = self._browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    def __enter__(self) -> Self:
+        self._pw = self._stealth_ctx.__enter__()
+        self._browser = self._pw.chromium.launch(headless=self.headless)
+        self._context = self._browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
             viewport={"width": 1920, "height": 1080}
         )
-
-        if self.headless and self.debug_mode:
+        if self.trace:
             self._context.tracing.start(snapshots=True, screenshots=True, sources=True)
-
-    def _open(self, url: str) -> Page:
-        page = self._context.new_page()
-        page.set_extra_http_headers({"Referer": "https://www.google.com/"})
-        page.goto(url, wait_until="domcontentloaded")
-        return page
-
-    def close(self) -> None:
-        if self.headless and self.debug_mode:
-            try:
-                self._context.tracing.stop(path="headless_trace.zip")
-            except Exception:
-                pass
-
-        self._context.close()
-        self._browser.close()
-        self._stealth_manager.__exit__(None, None, None)
-
-    def __enter__(self):
         return self
 
-    def __exit__(self, *_) -> None:
-        self.close()
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        if self.trace and self._context:
+            try:
+                self._context.tracing.stop(path="trace.zip")
+            except Exception:
+                pass
+        if self._context:
+            self._context.close()
+        if self._browser:
+            self._browser.close()
+        self._stealth_ctx.__exit__(exc_type, exc_val, exc_tb)
+
+    def _open(self, url: str) -> Page:
+        assert self._context is not None, "_WWBrowser must be used as a context manager"
+        page = self._context.new_page()
+        page.set_extra_http_headers({"Referer": "https://www.google.com/"})
+        page.goto(url, wait_until="load")
+        return page

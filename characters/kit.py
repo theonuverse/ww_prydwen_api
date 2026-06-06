@@ -1,29 +1,46 @@
 from playwright.sync_api import Page
 
-_TAB_SELECTOR = ".tabs .single-tab"
-_SKILL_CATEGORY_SELECTOR = ".tabs-skills .single-tab"
-_SKILL_BOX_SELECTOR = ".tab-inside.active:has(.tabs-skills) .tab-inside.active"
+# Navigation (top level: KIT, REVIEW, BUILD, ...)
+_MAIN_TAB_SELECTOR = ".tabs .single-tab"
+
+# Skill category tabs (ACTIVE SKILLS, PASSIVE SKILLS, CONCERTO SKILLS)
+_SKILL_CATEGORY_TAB_SELECTOR = ".tabs-skills .single-tab"
+
+# The active skill panel (contains the skill boxes)
+_SKILL_PANEL_SELECTOR = ".tab-inside.active:has(.tabs-skills) .tab-inside.active"
+
+# Individual skill boxes inside the panel
+_SKILL_BOX_CSS = ".box.skill-new"
+_SKILL_NAME_CSS = ".skill-info"
+_SKILL_DESC_CSS = ".skill-with-coloring"
+_SKILL_MULTIPLIER_CSS = ".pw-accordion-body"
+
+# Resonance chain section
 _RESONANCE_CHAIN_SELECTOR = ".skills.dupes .box"
+
+# Individual resonance chain information inside the panel
+_RS_SEQUENCE_CS = ".skill-icon"
+_RS_NAME_CS = ".skill-info"
+_RS_DESCRIPTION_CS = ".skill-with-coloring"
+
+# Upgrade materials section
 _UPGRADE_BOX_SELECTOR = ".upgrade-materials .box"
 
 
 class Multipliers:
-    """Stores and retrieves skill multiplier data across different levels."""
+    """Stores and retrieves skill multiplier data indexed by level."""
 
     def __init__(self, data: dict[int, str]) -> None:
-        """
-        Args:
-            data: A dictionary mapping level integers to string values.
-        """
+        """Initialize Multipliers with level-indexed data."""
         self._data = data
 
     def get(self, level: int) -> str:
-        """Retrieves the multiplier value for a specific level."""
+        """Retrieve the multiplier value for a specific level."""
         return self._data[level]
 
     @property
     def all(self) -> dict[int, str]:
-        """Returns all level mappings."""
+        """Return all level-to-multiplier mappings."""
         return self._data
 
     def __repr__(self) -> str:
@@ -31,7 +48,7 @@ class Multipliers:
 
 
 class Skill:
-    """Represents a character skill with its metadata and level-based values."""
+    """Represents a character skill with metadata and level-based scaling data."""
 
     def __init__(
         self,
@@ -40,13 +57,7 @@ class Skill:
         description: str,
         multipliers: Multipliers
     ) -> None:
-        """
-        Args:
-            category: The skill category (e.g., Active, Passive).
-            name: The display name of the skill.
-            description: The descriptive text of the skill.
-            multipliers: A Multipliers instance containing level scaling data.
-        """
+        """Initialize a Skill instance."""
         self.category = category
         self.name = name
         self.description = description
@@ -56,153 +67,130 @@ class Skill:
         return f"Skill(name={self.name!r}, category={self.category!r})"
 
 
-class SkillAccessor:
-    """Helper class that allows calling directly with a 1-based index."""
+class ActiveSkills:
+    """Accessor for active character skills with named properties."""
 
-    def __init__(self, skills_instance: "Skills", category_index: int) -> None:
-        self._skills = skills_instance
-        self._category_index = category_index
-
-    def __call__(self, index: int) -> Skill:
-        """Retrieves the skill at the given index (1-based)."""
-        return self._skills._fetch(self._category_index, index)
-
-    def _get_total_count(self) -> int:
-        """Helper to determine how many skills exist in this category on the page."""
-        self._skills._page.locator(_SKILL_CATEGORY_SELECTOR).nth(self._category_index).click()
-        return self._skills._page.locator(_SKILL_BOX_SELECTOR).locator(".box.skill-new").count()
-
-    @property
-    def all(self) -> dict[int, Skill]:
-        """Retrieves all available skills in this category as a 1-based dictionary."""
-        count = self._get_total_count()
-        return {i: self(i) for i in range(1, count + 1)}
-
-
-class ActiveSkills(SkillAccessor):
-    """Accessor for active skills with explicit properties."""
-
-    def __init__(self, skills_instance: "Skills") -> None:
-        super().__init__(skills_instance, category_index=0)
+    def __init__(self, skills: "Skills") -> None:
+        """Initialize ActiveSkills accessor."""
+        self._skills = skills
 
     @property
     def basic_attack(self) -> Skill:
-        """Retrieves the Basic Attack (Index 1)."""
-        return self(1)
+        """Retrieve the Basic Attack skill (Index 1)."""
+        return self._skills._fetch(0, 1)
 
     @property
     def resonance_skill(self) -> Skill:
-        """Retrieves the Resonance Skill (Index 2)."""
-        return self(2)
+        """Retrieve the Resonance Skill (Index 2)."""
+        return self._skills._fetch(0, 2)
 
     @property
     def resonance_liberation(self) -> Skill:
-        """Retrieves the Resonance Liberation (Index 3)."""
-        return self(3)
+        """Retrieve the Resonance Liberation ultimate (Index 3)."""
+        return self._skills._fetch(0, 3)
 
 
-class PassiveSkills(SkillAccessor):
-    """Accessor for passive skills with dynamic index mapping based on skill count."""
+class PassiveSkills:
+    """Accessor for passive character skills with dynamic properties."""
 
-    def __init__(self, skills_instance: "Skills") -> None:
-        super().__init__(skills_instance, category_index=1)
+    def __init__(self, skills: "Skills") -> None:
+        """Initialize PassiveSkills accessor."""
+        self._skills = skills
 
-    def _get_total_passive_count(self) -> int:
-        """Helper to determine how many passive skills this character has on the page."""
-        self._skills._page.locator(_SKILL_CATEGORY_SELECTOR).nth(self._category_index).click()
-        return self._skills._page.locator(_SKILL_BOX_SELECTOR).locator(".box.skill-new").count()
+    def _count(self) -> int:
+        """Get total count of passive skills for this character."""
+        self._skills._page.locator(_SKILL_CATEGORY_TAB_SELECTOR).nth(1).click()
+        return self._skills._page.locator(_SKILL_CATEGORY_TAB_SELECTOR).locator(_SKILL_BOX_CSS).count()
 
     @property
     def forte_circuit(self) -> Skill:
-        """Retrieves the main Forte Circuit (Always Index 1)."""
-        return self(1)
+        """Retrieve the Forte Circuit passive (Index 1)."""
+        return self._skills._fetch(1, 1)
 
     @property
     def forte_circuit_tune(self) -> Skill | None:
-        """Retrieves the Forte Circuit Tune if it exists, otherwise returns None."""
-        if self._get_total_passive_count() == 4:
-            return self(2)
+        """Retrieve the Forte Circuit Tune if available, else None."""
+        if self._count() == 4:
+            return self._skills._fetch(1, 2)
         return None
 
     @property
     def inherent_skill_1(self) -> Skill:
-        """Retrieves the first Inherent Skill (Index 2 if 3 skills total, Index 3 if 4 skills total)."""
-        index = 3 if self._get_total_passive_count() == 4 else 2
-        return self(index)
+        """Retrieve the first Inherent Skill (dynamic index based on Tune presence)."""
+        return self._skills._fetch(1, 3 if self._count() == 4 else 2)
 
     @property
     def inherent_skill_2(self) -> Skill:
-        """Retrieves the second Inherent Skill (Index 4 if 3 skills total, Index 4 if 4 skills total)."""
-        index = 4 if self._get_total_passive_count() == 4 else 3
-        return self(index)
+        """Retrieve the second Inherent Skill (always Index 3 or 4)."""
+        return self._skills._fetch(1, 4 if self._count() == 4 else 3)
 
 
-class ConcertoSkills(SkillAccessor):
-    """Accessor for concerto skills with explicit properties."""
+class ConcertoSkills:
+    """Accessor for concerto-related entry and exit skills."""
 
-    def __init__(self, skills_instance: "Skills") -> None:
-        super().__init__(skills_instance, category_index=2)
+    def __init__(self, skills: "Skills") -> None:
+        """Initialize ConcertoSkills accessor."""
+        self._skills = skills
 
     @property
     def intro_skill(self) -> Skill:
-        """Retrieves the Intro Skill (Index 1)"""
-        return self(1)
+        """Retrieve the Intro Skill (Index 1)."""
+        return self._skills._fetch(2, 1)
 
     @property
     def outro_skill(self) -> Skill:
-        """Retrieves the Outro Skill (Index 2)"""
-        return self(2)
+        """Retrieve the Outro Skill (Index 2)."""
+        return self._skills._fetch(2, 2)
 
 
 class Skills:
-    """Interface to interact with and scrape character skill data."""
+    """Primary interface for accessing all character skill categories."""
+
+    active: ActiveSkills
+    passive: PassiveSkills
+    concerto: ConcertoSkills
 
     def __init__(self, page: Page) -> None:
+        """Initialize Skills interface with page and skill accessors."""
         self._page = page
-
-        # Instanzen mit echten Properties für IntelliSense Support
         self.active = ActiveSkills(self)
         self.passive = PassiveSkills(self)
         self.concerto = ConcertoSkills(self)
 
-    def _fetch(self, skill_category_index: int, skill_box_index: int) -> Skill:
-        """Internal helper to navigate and scrape skill data from the UI."""
-        self._page.locator(_SKILL_CATEGORY_SELECTOR).nth(skill_category_index).click()
+    def _fetch(self, category_index: int, box_index: int) -> Skill:
+        """Internal helper to navigate and scrape skill data from the page UI."""
+        self._page.locator(_SKILL_CATEGORY_TAB_SELECTOR).nth(category_index).click()
 
-        category = self._page.locator(_SKILL_CATEGORY_SELECTOR).nth(skill_category_index).inner_text()
-        skill = self._page.locator(_SKILL_BOX_SELECTOR).locator(".box.skill-new").nth(skill_box_index - 1)
+        category = (
+            self._page.locator(_SKILL_CATEGORY_TAB_SELECTOR).nth(category_index).inner_text()
+        )
 
-        name = skill.locator(".skill-info").inner_text()
-        description = skill.locator(".skill-with-coloring").inner_text()
+        skill = (
+            self._page.locator(_SKILL_PANEL_SELECTOR).locator(_SKILL_BOX_CSS).nth(box_index - 1)
+        )
+        name = skill.locator(_SKILL_NAME_CSS).inner_text()
+        description = skill.locator(_SKILL_DESC_CSS).inner_text()
 
-        data = {}
+        multiplier_values = {}
+
         button = skill.locator("button")
-
-        # Wenn der Button da ist (nur bei Forte Circuit), durchklicken.
-        # Bei Tune und Inherent-Skills wird dieser Block einfach übersprungen.
         if button.count() > 0:
             button.click()
             slider = skill.locator("[role='slider']")
             slider.click()
-
             for i in range(1, 11):
                 if i > 1:
                     slider.press("ArrowRight")
-                data[i] = skill.locator(".pw-accordion-body").inner_text()
+                multiplier_values[i] = skill.locator(_SKILL_MULTIPLIER_CSS).inner_text()
 
-        return Skill(category, name, description, Multipliers(data))
+        return Skill(category, name, description, Multipliers(multiplier_values))
 
 
 class ResonanceChainNode:
     """Represents a single node in a character's resonance chain."""
 
     def __init__(self, sequence: str, name: str, description: str) -> None:
-        """
-        Args:
-            sequence: The sequence identifier for the node.
-            name: The name of the resonance effect.
-            description: Details of the resonance effect.
-        """
+        """Initialize a ResonanceChainNode."""
         self.sequence = sequence
         self.name = name
         self.description = description
@@ -211,15 +199,39 @@ class ResonanceChainNode:
         return f"ResonanceChainNode(sequence={self.sequence!r}, name={self.name!r})"
 
 
+class ResonanceChain:
+    """Interface for accessing character resonance chain (constellation) nodes."""
+
+    def __init__(self, page: Page) -> None:
+        """Initialize ResonanceChain interface."""
+        self._page = page
+
+    def _parse_node(self, node) -> ResonanceChainNode:
+        """Parse a DOM node element into a ResonanceChainNode instance."""
+        sequence = node.locator(_RS_SEQUENCE_CS).inner_text()
+        name = node.locator(_RS_NAME_CS).inner_text()
+        description = node.locator(_RS_DESCRIPTION_CS).inner_text()
+
+        return ResonanceChainNode(sequence, name, description)
+
+    def get(self, index: int) -> ResonanceChainNode:
+        """Retrieve a resonance chain node by 1-based index."""
+        node = self._page.locator(_RESONANCE_CHAIN_SELECTOR).nth(index - 1)
+        return self._parse_node(node)
+
+    @property
+    def all(self) -> dict[int, ResonanceChainNode]:
+        """Retrieve all resonance chain nodes as a 1-based dictionary."""
+        return {
+            i: self._parse_node(node) for i, node in enumerate(self._page.locator(_RESONANCE_CHAIN_SELECTOR).all(), 1)
+        }
+
+
 class Material:
-    """Represents an upgrade material requirement."""
+    """Represents a single upgrade material requirement."""
 
     def __init__(self, name: str | None, quantity: str | None) -> None:
-        """
-        Args:
-            name: The name of the material.
-            quantity: The required amount of the material.
-        """
+        """Initialize a Material instance."""
         self.name = name
         self.quantity = quantity
 
@@ -227,104 +239,76 @@ class Material:
         return f"Material(name={self.name!r}, quantity={self.quantity!r})"
 
 
-class ResonanceChain:
-    """Interface to interact with and scrape character resonance chain nodes."""
-
-    def __init__(self, page: Page) -> None:
-        self._page = page
-
-    def _parse_node(self, node) -> ResonanceChainNode:
-        """Parse helper function."""
-        sequence = node.locator(".skill-icon").inner_text()
-        name = node.locator(".skill-info").inner_text()
-        description = node.locator(".skill-with-coloring").inner_text()
-
-        return ResonanceChainNode(sequence, name, description)
-
-    def get(self, index: int) -> ResonanceChainNode:
-        """Retrieves a specific resonance node by index (1-based)."""
-        node = self._page.locator(_RESONANCE_CHAIN_SELECTOR).nth(index - 1)
-        return self._parse_node(node)
-
-    @property
-    def all(self) -> dict[int, ResonanceChainNode]:
-        """Retrieves all resonance nodes in the chain."""
-        return {i: self._parse_node(node) for i, node in enumerate(self._page.locator(_RESONANCE_CHAIN_SELECTOR).all(), 1)}
-
-
 class UpgradeCategory:
-    """Represents a specific category of upgrade materials (e.g., Ascension)."""
+    """Represents a specific category of upgrade materials (e.g., Ascension, Skills)."""
 
     def __init__(self, page: Page, box_index: int) -> None:
+        """Initialize an UpgradeCategory instance."""
         self._page = page
         self._box_index = box_index
 
     def name(self) -> str | None:
-        """Returns the name of the upgrade category."""
+        """Return the name of this upgrade category."""
         if self._page.locator(_UPGRADE_BOX_SELECTOR).count() == 0:
             return None
         box = self._page.locator(_UPGRADE_BOX_SELECTOR).nth(self._box_index)
+
         return box.locator("h5").inner_text()
 
     def _parse_material(self, material) -> Material:
         """Parse helper function."""
         name = material.locator("strong[class*='rarity-']").inner_text()
         quantity = material.locator("strong").nth(0).inner_text()
+
         return Material(name, quantity)
 
     def get(self, index: int) -> Material:
-        """Retrieves a specific material by index."""
+        """Retrieve a specific material by 1-based index in this category."""
         if self._page.locator(_UPGRADE_BOX_SELECTOR).count() == 0:
             return Material(None, None)
 
         box = self._page.locator(_UPGRADE_BOX_SELECTOR).nth(self._box_index)
         material = box.locator("li").nth(index - 1)
+
         return self._parse_material(material)
 
     @property
     def all(self) -> dict[int, Material]:
-        """Retrieves all materials required for this category."""
+        """Retrieve all materials in this category as a 1-based dictionary."""
         if self._page.locator(_UPGRADE_BOX_SELECTOR).count() == 0:
             return {}
         box = self._page.locator(_UPGRADE_BOX_SELECTOR).nth(self._box_index)
-        return {i: self._parse_material(mat) for i, mat in enumerate(box.locator("li").all(), 1)}
+
+        return {
+            i: self._parse_material(mat) for i, mat in enumerate(box.locator("li").all(), 1)
+        }
 
 
 class UpgradeMaterials:
     """Interface to access various character upgrade material categories."""
 
     def __init__(self, page: Page) -> None:
+        """Initialize UpgradeMaterials interface."""
         self._page = page
 
     @property
     def character_ascension(self) -> UpgradeCategory:
-        """Returns the ascension material category."""
+        """Access the character ascension material category."""
         return UpgradeCategory(self._page, 0)
 
     @property
     def skill_upgrades(self) -> UpgradeCategory:
-        """Returns the skill upgrade material category."""
+        """Access the skill upgrade material category."""
         return UpgradeCategory(self._page, 1)
 
 
 class Kit:
-    """Primary entry point for interacting with a character's kit page."""
+    """Primary entry point for accessing a character's complete kit information."""
 
     def __init__(self, page: Page) -> None:
+        """Initialize Kit interface and navigate to the kit tab."""
         self._page = page
-        self._page.locator(_TAB_SELECTOR).nth(0).click()
-
-    @property
-    def skills(self) -> Skills:
-        """Returns the interface for interacting with character skills."""
-        return Skills(self._page)
-
-    @property
-    def resonance_chain(self) -> ResonanceChain:
-        """Returns the interface for interacting with the resonance chain."""
-        return ResonanceChain(self._page)
-
-    @property
-    def upgrade_materials(self) -> UpgradeMaterials:
-        """Returns the interface for interacting with upgrade materials."""
-        return UpgradeMaterials(self._page)
+        self._page.locator(_MAIN_TAB_SELECTOR).nth(0).click()
+        self.skills = Skills(self._page)
+        self.resonance_chain = ResonanceChain(self._page)
+        self.upgrade_materials = UpgradeMaterials(self._page)

@@ -1,127 +1,110 @@
 from playwright.sync_api import Page
 
+# Navigation (top level: KIT, REVIEW, BUILD, ...)
 _TAB_SELECTOR = ".tabs .single-tab"
+
+# Tier list blocks (standard and value)
 _TIER_LIST_SELECTOR = ".detailed-ratings.ww"
-_TAB_PROCON_REVIEW_SELECTOR = ".tab-inside.active .section-analysis"
+
+# Review tab content panel
+_REVIEW_PANEL_SELECTOR = ".tab-inside.active:visible"
+
+# ReviewPoints
+_REVIEW_LIST_CSS = ".raw.list li"
+_REVIEW_TEXT_CSS = ".review.raw"
+
+# ModeRatings
+_RATING_BOX_CONTAINER_CSS = ".rating-box-container"
+_RATING_BOX_CSS = "div[class*='rating-box']"
 
 
 class ModeRatings:
-    """Scrapes the individual mode tier ratings for a designated role block."""
+    """Provides tier ratings for a specific game mode (e.g., TOA, Whimpering Wastes)."""
 
     def __init__(self, page: Page, list_selector: str, role_name: str, list_index: int) -> None:
+        """Initialize ModeRatings for a specific role and mode."""
         self._page = page
         self._list_selector = list_selector
         self._role_name = role_name
         self._list_index = list_index
 
     def _get_tier(self, container_index: int) -> str | None:
-        """Extracts the inner tier text from the container at the specified index."""
+        """Extract tier text from a specific mode container."""
         target_blocks = self._page.locator(f"h5:has-text('{self._role_name}') + {self._list_selector}")
-
         if target_blocks.count() <= self._list_index:
             return None
-
         target_block = target_blocks.nth(self._list_index)
-
-        container = target_block.locator(".rating-box-container").nth(container_index)
-
+        container = target_block.locator(_RATING_BOX_CONTAINER_CSS).nth(container_index)
         if container.count() == 0:
             return None
-
-        return container.locator("div[class*='rating-box']").inner_text()
+        return container.locator(_RATING_BOX_CSS).inner_text()
 
     @property
     def toa(self) -> str | None:
-        """Retrieves the Tower of Adversity tier rating."""
+        """Retrieve the character's Tower of Adversity tier rating."""
         return self._get_tier(0)
 
     @property
     def whiwa(self) -> str | None:
-        """Retrieves the Whimpering Wastes tier rating."""
+        """Retrieve the character's Whimpering Wastes tier rating."""
         return self._get_tier(1)
 
 
 class RoleCategories:
-    """Dispatches mode rating queries to the corresponding role block position."""
+    """Dispatches tier rating queries to the appropriate role category block."""
 
     def __init__(self, page: Page, list_selector: str, list_index: int) -> None:
-        self._page = page
-        self._list_selector = list_selector
-        self._list_index = list_index
-
-    @property
-    def dps(self) -> ModeRatings:
-        """Accesses the ratings for the DPS role layout block."""
-        return ModeRatings(self._page, self._list_selector, "DPS", self._list_index)
-
-    @property
-    def hybrid(self) -> ModeRatings:
-        """Accesses the ratings for the Hybrid role layout block."""
-        return ModeRatings(self._page, self._list_selector, "Hybrid", self._list_index)
-
-    @property
-    def support(self) -> ModeRatings:
-        """Accesses the ratings for the Support role layout block."""
-        return ModeRatings(self._page, self._list_selector, "Support", self._list_index)
+        """Initialize RoleCategories for tier list access."""
+        self.dps = ModeRatings(page, list_selector, "DPS", list_index)
+        self.hybrid = ModeRatings(page, list_selector, "Hybrid", list_index)
+        self.support = ModeRatings(page, list_selector, "Support", list_index)
 
 
 class Ratings:
-    """Interface to switch between the standard tier list and the value tier list."""
+    """Interface to access different tier list variations (standard vs value)."""
 
     def __init__(self, page: Page) -> None:
-        self._page = page
-
-    @property
-    def tier_list(self) -> RoleCategories:
-        """Accesses the standard character tier list category (1st occurrence)."""
-        return RoleCategories(self._page, _TIER_LIST_SELECTOR, list_index=0)
-
-    @property
-    def value_tier_list(self) -> RoleCategories:
-        """Accesses the pull value tier list category (2nd occurrence)."""
-        return RoleCategories(self._page, _TIER_LIST_SELECTOR, list_index=1)
+        """Initialize Ratings interface with both tier list variants."""
+        self.tier_list = RoleCategories(page, _TIER_LIST_SELECTOR, list_index=0)
+        self.value_tier_list = RoleCategories(page, _TIER_LIST_SELECTOR, list_index=1)
 
 
 class ReviewPoints:
-    """Interface to interact with and scrape specific review points (e.g., Pros or Cons)."""
+    """Interface to interact with specific review point sections (e.g., Pros or Cons)."""
 
     def __init__(self, page: Page, box_selector: str) -> None:
+        """Initialize ReviewPoints for a specific review section."""
         self._page = page
         self._box_selector = box_selector
 
+    def _panel(self):
+        """Get the active review panel locator."""
+        return self._page.locator(_REVIEW_PANEL_SELECTOR)
+
     def get(self, index: int) -> str:
-        """Retrieves a specific point by index (1-based)."""
-        box = self._page.locator(_TAB_PROCON_REVIEW_SELECTOR).locator(self._box_selector)
-        return box.locator(".raw.list li").nth(index - 1).inner_text()
+        """Retrieve a specific review point by 1-based index."""
+        box = self._panel().locator(self._box_selector)
+        return box.locator(_REVIEW_LIST_CSS).nth(index - 1).inner_text()
 
     @property
     def all(self) -> dict[int, str]:
-        """Retrieves all points in this section."""
-        box = self._page.locator(_TAB_PROCON_REVIEW_SELECTOR).locator(self._box_selector)
-        return {i: item.inner_text() for i, item in enumerate(box.locator(".raw.list li").all(), 1)}
+        """Retrieve all review points in this section as a 1-based dictionary."""
+        box = self._panel().locator(self._box_selector)
+        return {i: item.inner_text() for i, item in enumerate(box.locator(_REVIEW_LIST_CSS).all(), 1)}
 
 
 class Review:
+    """Primary interface for accessing character review and tier rating data."""
+
     def __init__(self, page: Page) -> None:
+        """Initialize Review interface and navigate to the review tab."""
         self._page = page
         self._page.locator(_TAB_SELECTOR).nth(1).click()
-
-    @property
-    def pros(self) -> ReviewPoints:
-        """Retrieve pros."""
-        return ReviewPoints(self._page, ".box.pros")
-
-    @property
-    def cons(self) -> ReviewPoints:
-        """Retrieve cons."""
-        return ReviewPoints(self._page, ".box.cons")
+        self.pros = ReviewPoints(page, ".box.pros")
+        self.cons = ReviewPoints(page, ".box.cons")
+        self.ratings = Ratings(page)
 
     @property
     def full_review(self) -> str:
-        """Retrieves the full review."""
-        return self._page.locator(f"{_TAB_PROCON_REVIEW_SELECTOR} .review.raw").inner_text()
-
-    @property
-    def ratings(self) -> Ratings:
-        """Access the character's tier list ratings across roles and modes."""
-        return Ratings(self._page)
+        """Retrieve the complete written review text."""
+        return self._page.locator(_REVIEW_PANEL_SELECTOR).locator(_REVIEW_TEXT_CSS).inner_text()
