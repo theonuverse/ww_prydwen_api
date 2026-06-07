@@ -1,6 +1,7 @@
 from playwright.sync_api import Page
 from .kit import Kit
 from .review import Review
+from .build import Build
 
 
 class Character:
@@ -37,3 +38,8 @@ class Character:
         Retrieves the character review.
         """
         return Review(self._page)
+
+    @property
+    def build(self) -> Build:
+        """Retrieves the character build."""
+        return Build(self._page)
